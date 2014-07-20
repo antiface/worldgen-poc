@@ -1,13 +1,10 @@
 import sys, random, math
-from helper_functions import float_equal, dot_product, random_vector
 
 # worldgen
 
-''' 
-basic perlin noise: 
-generate 6 random noises (of width 256, 128, 64, 32, 16, 8 respectively), scale all of them to be 256x256,
-then average the 256 with the 128, then that with the 64, etc. (or just average all of them)
-'''
+# check if two floats are equal
+def float_equal(a,b):
+	return abs(a-b) <= 0.0000001
 
 # generates a wxh 2d array of white noise (floats between 0 and 1)
 def white_noise(w,h):
@@ -40,33 +37,12 @@ def generate_octave(grid, factor):
 
 	ret = []
 
-	# 3print new_width, new_height
-
 	for y in range(new_height):
 		y_scale = (float(y)/new_height)*(grid_height-1)
 
 		row = []
 		for x in range(new_width):
 			x_scale = (float(x)/new_width)*(grid_width-1)
-			
-
-			'''
-			+-+ <- 1. take the average of these two first... (blend_top)
-			|.| 	<- 3. to interpolate to this point (blend_overall)
-			+-+ <- 2. then take the average of these two (blend_bottom)
-			'''
-
-			'''
-			print 'coordinate: ' + str((x_scale,y_scale))
-			print 'top left: ' + str((int(math.floor(x_scale)),int(math.floor(y_scale))))
-			print 'bottom right: ' + str((int(math.ceil(x_scale)),int(math.ceil(y_scale))))
-			'''
-
-			'''
-			if (float_equal(x_scale,math.floor(x_scale)) and float_equal(y_scale, math.floor(y_scale))):
-				row.append(grid[y_scale][x_scale])
-				continue
-			'''
 
 			top_left = grid[int(math.floor(y_scale))][int(math.floor(x_scale))]
 			top_right = grid[int(math.floor(y_scale))][int(math.ceil(x_scale))]
@@ -152,12 +128,9 @@ def usage():
 	print 'Usage: python worldgen.py [WIDTH] [HEIGHT]'
 
 if __name__ == "__main__":
-	# prettify_grid(perlin_noise(50,50))
 	try:
 
 		noise_grid = generate_noise(int(sys.argv[1]),int(sys.argv[2]))
-		# print noise_grid
 		print prettify_grid(threshold_noise_to_terrain(noise_grid))
 	except:
 		usage()
-		# print generate_noise(256,256)
