@@ -10,17 +10,14 @@ def float_equal(a,b):
 def white_noise(w,h):
 	w = int(w)
 	h = int(h)
-	return [[random.random() for i in range(0,w)] for j in range(0,h)]
+	grid = [[random.random() for i in range(0,w)] for j in range(0,h)]
+	if debug_mode: print grid
+	return grid
 
-# cosine interpolate a <= x <= b, interpolates x on a stretched cosine curve between a and b
-def cosine_interpolate(a,b,x):
-	f=1-math.cos(0.5*math.pi*x)
-	return (a*(f)+b*(1-f))
-
-# linear interpolate a <= x <= b, interpolates x on a straight line between a and b
-def linear_interpolate(a,b,c):
-	f = x
-	return (a*(f)+b*(1-f))
+# interpolate a <= x <= b, interpolates x on a stretched cosine curve between a and b
+# default function is
+def interpolate(a,b,x,f=(lambda x: math.cos(0.5*math.pi*x))):
+	return (a*(f(x))+b*(1-f(x)))
 
 # scales up a grid and interpolates
 # in other words, it creates the kth octave where (using default settings) k=|8-factor|.
@@ -49,9 +46,9 @@ def generate_octave(grid, factor):
 			bottom_left = grid[int(math.ceil(y_scale))][int(math.floor(x_scale))]
 			bottom_right = grid[int(math.ceil(y_scale))][int(math.ceil(x_scale))]
 
-			blend_top = cosine_interpolate(top_left, top_right, x_scale-math.floor(x_scale))
-			blend_bottom = cosine_interpolate(bottom_left, bottom_right, x_scale-math.floor(x_scale))
-			blend_overall = cosine_interpolate(blend_top, blend_bottom, y_scale-math.floor(y_scale))
+			blend_top = interpolate(top_left, top_right, x_scale-math.floor(x_scale))
+			blend_bottom = interpolate(bottom_left, bottom_right, x_scale-math.floor(x_scale))
+			blend_overall = interpolate(blend_top, blend_bottom, y_scale-math.floor(y_scale))
 
 			row.append(blend_overall)
 		ret.append(row)
@@ -90,33 +87,29 @@ def avg_grids(grids):
 
 # generates noise grid by generating and summing up octaves
 # the default octave scales are 
-def generate_noise(w, h, octaves=range(3,9)[::-1]):
+# needs rewrite, this is pretty hacky right now
+def generate_noise(w, h, octaves=range(5,9)[::-1]):
 	return avg_grids([generate_octave(white_noise(w*(2**(octave-octaves[0])), h*(2**(octave-octaves[0]))), (octaves[0]-octave)) for octave in octaves])
 
 # converts a 2d grid into their corresponding terrain type
 def threshold_noise_to_terrain(grid, 
-	thresholds={ 
-		(0.0,0.2): '.',
-		(0.2,0.5): '_',
-		(0.5,1.0): '^'
+	terrain={ 
+		(0.0,0.47): ' ',
+		(0.47,0.85): '.',
+		(0.85,1.1): '^'
 	}):
-
-	print grid
 
 	ret = []
 	for row in grid:
 		ret_row = []
-		for point in row:
+
+		for height in row:
 			# check thresholds for grid
 
-			if point < 0.45:
-				char = ' '
-			elif point < 0.65:
-				char = '.'
-			else:
-				char = '^'
-
-			ret_row.append(char)
+			for (lbound,ubound) in terrain:
+				if height >= lbound and height < ubound:
+					ret_row.append(terrain[(lbound,ubound)])
+			
 		ret.append(ret_row)
 	return ret
 
@@ -125,12 +118,19 @@ def prettify_grid(grid):
 	return '\n'.join([''.join(row) for row in grid])
 
 def usage():
-	print 'Usage: python worldgen.py [WIDTH] [HEIGHT]'
+	print '''Usage: python worldgen.py [WIDTH] [HEIGHT] [options]
+List of options:
+	--debug - print debug messages
+	'''
 
 if __name__ == "__main__":
 	try:
+		debug_mode = '--debug' in sys.argv
+		#noise_grid = generate_noise(int(sys.argv[1]),int(sys.argv[2]))
+		#print prettify_grid(threshold_noise_to_terrain(noise_grid))
 
-		noise_grid = generate_noise(int(sys.argv[1]),int(sys.argv[2]))
-		print prettify_grid(threshold_noise_to_terrain(noise_grid))
+		print prettify_grid(threshold_noise_to_terrain(generate_octave(white_noise(int(sys.argv[1]),int(sys.argv[2])), int(sys.argv[3]))))
 	except:
 		usage()
+
+		

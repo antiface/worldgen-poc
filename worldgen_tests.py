@@ -1,6 +1,5 @@
 import unittest
-from worldgen import prettify_grid, interpolate
-from helper_functions import float_equal, dot_product
+from worldgen import prettify_grid, interpolate, generate_noise
 
 # Unit testing module for worldgen.py 
 
