@@ -2,27 +2,47 @@ import sys, random, math
 
 # worldgen
 
-# check if two floats are equal
+# HELPER FUNCTIONS
+
+debug_mode = False
+
+# float_equal check if two floats are equal
 def float_equal(a,b):
 	return abs(a-b) <= 0.0000001
 
+# returns the euclidean distance between points p1 and p2
+def point_distance(p1,p2):
+	return math.sqrt(sum([(x-y)**2 for (x,y) in zip(p1,p2)]))
+
+# NOISE GENERATION FUNCTIONS
+
 # generates a wxh 2d array of white noise (floats between 0 and 1)
-def white_noise(w,h):
+def white_noise(w,h, weight_points=[], proximity=5.0):
 	w = int(w)
 	h = int(h)
-	grid = [[random.random() for i in range(0,w)] for j in range(0,h)]
+	grid = [[random.random() for i in range(w)] for j in range(h)]
+
+	if weight_points:
+		for y in range(h):
+			for x in range(w):
+				for pt in weight_points:
+					if point_distance(pt, (x,y)) <= proximity:
+						grid[y][x] += math.min(random.random(), 1.0-grid[y][x])
+
+
 	if debug_mode: print grid
 	return grid
+
+# THE ACTUAL ALGORITHM
 
 # interpolate a <= x <= b, interpolates x on a stretched cosine curve between a and b
 # default function is
 def interpolate(a,b,x,f=(lambda x: math.cos(0.5*math.pi*x))):
 	return (a*(f(x))+b*(1-f(x)))
 
-# scales up a grid and interpolates
+# scales up a grid by factor of 2**factor rand interpolates
 # in other words, it creates the kth octave where (using default settings) k=|8-factor|.
-def generate_octave(grid, factor):
-	factor = 2.0**factor
+def scale_grid(grid, factor):
 	if factor == 1:
 		return grid	
 
@@ -88,15 +108,17 @@ def avg_grids(grids):
 # generates noise grid by generating and summing up octaves
 # the default octave scales are 
 # needs rewrite, this is pretty hacky right now
-def generate_noise(w, h, octaves=range(5,9)[::-1]):
-	return avg_grids([generate_octave(white_noise(w*(2**(octave-octaves[0])), h*(2**(octave-octaves[0]))), (octaves[0]-octave)) for octave in octaves])
+def generate_noise(w, h, octaves=[4,5,6,7]):
+	return avg_grids([scale_grid(white_noise(w*(2**(octave-octaves[-1])), h*(2**(octave-octaves[-1]))), 2**(octaves[-1]-octave)) for octave in octaves])
+
+# POST-PROCESSING
 
 # converts a 2d grid into their corresponding terrain type
 def threshold_noise_to_terrain(grid, 
 	terrain={ 
-		(0.0,0.47): ' ',
-		(0.47,0.85): '.',
-		(0.85,1.1): '^'
+		(0.0,0.5): ' ',
+		(0.5,0.7): '.',
+		(0.7,2.0): '^'
 	}):
 
 	ret = []
@@ -126,10 +148,16 @@ List of options:
 if __name__ == "__main__":
 	try:
 		debug_mode = '--debug' in sys.argv
-		#noise_grid = generate_noise(int(sys.argv[1]),int(sys.argv[2]))
-		#print prettify_grid(threshold_noise_to_terrain(noise_grid))
+		noise_grid = generate_noise(int(sys.argv[1]),int(sys.argv[2]))
+		#noise_grid = scale_grid(white_noise(int(sys.argv[1]),int(sys.argv[2])), 3)
+		print prettify_grid(threshold_noise_to_terrain(noise_grid))
+		
+		'''
+		list_points = [(random.randint(0,15),random.randint(0,15)) for i in range(random.randint(0,6))]
+		print prettify_grid(threshold_noise_to_terrain(scale_grid(white_noise(16,16, list_points), 3)))
+		'''
 
-		print prettify_grid(threshold_noise_to_terrain(generate_octave(white_noise(int(sys.argv[1]),int(sys.argv[2])), int(sys.argv[3]))))
+		#print prettify_grid(threshold_noise_to_terrain(scale_grid(white_noise(int(sys.argv[1]),int(sys.argv[2])), int(sys.argv[3]))))
 	except:
 		usage()
 
