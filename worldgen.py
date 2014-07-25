@@ -97,40 +97,51 @@ def avg_grids(grids):
 		amplitude *= persistence
 
 	# normalize the final graph
-	'''
 	for y in range(0, len(grid)):
 					for x in range(0, len(grid[y])):
 						final_grid[y][x] /= total_amplitude
-	'''
 
 	return final_grid
 
 # generates noise grid by generating and summing up octaves
 # the default octave scales are 
 # needs rewrite, this is pretty hacky right now
-def generate_noise(w, h, octaves=[4,5,6,7]):
+def generate_noise(w, h, octaves=[4,5,6,7,8]):
 	return avg_grids([scale_grid(white_noise(w*(2**(octave-octaves[-1])), h*(2**(octave-octaves[-1]))), 2**(octaves[-1]-octave)) for octave in octaves])
 
 # POST-PROCESSING
 
 # converts a 2d grid into their corresponding terrain type
-def threshold_noise_to_terrain(grid, 
-	terrain={ 
-		(0.0,0.5): ' ',
-		(0.5,0.7): '.',
-		(0.7,2.0): '^'
-	}):
+# TODO: make the terrain dict dynamic to the data given
+def threshold_noise_to_terrain(grid):
+
+	# analyze grid to determine terrain
+
+	# determine the data mean and std.dev, then use that to set the range
+	#  tentative: < -1mu = sea, -1mu to 1mu = land, > 1mu = mountain 
+
+	grid_width = len(grid[0])
+	grid_height = len(grid)
+
+	avg = sum([sum(row) for row in grid])/(grid_width*grid_height)
+	print avg
+	variance = sum([(tile-avg)**2 for tile in row for row in grid])/(grid_width*grid_height)
+	stdev = variance**0.5
+	print stdev
+
+	terrain = [(avg-(0.6*stdev), ' '), (avg+(1.25*stdev), '.'), (1.1, '^')]
 
 	ret = []
 	for row in grid:
 		ret_row = []
 
 		for height in row:
-			# check thresholds for grid
 
-			for (lbound,ubound) in terrain:
-				if height >= lbound and height < ubound:
-					ret_row.append(terrain[(lbound,ubound)])
+			# check thresholds for tile
+			for (ubound, tile) in terrain:
+				if height <= ubound:
+					ret_row.append(tile)
+					break
 			
 		ret.append(ret_row)
 	return ret
@@ -149,15 +160,8 @@ if __name__ == "__main__":
 	try:
 		debug_mode = '--debug' in sys.argv
 		noise_grid = generate_noise(int(sys.argv[1]),int(sys.argv[2]))
-		#noise_grid = scale_grid(white_noise(int(sys.argv[1]),int(sys.argv[2])), 3)
 		print prettify_grid(threshold_noise_to_terrain(noise_grid))
-		
-		'''
-		list_points = [(random.randint(0,15),random.randint(0,15)) for i in range(random.randint(0,6))]
-		print prettify_grid(threshold_noise_to_terrain(scale_grid(white_noise(16,16, list_points), 3)))
-		'''
 
-		#print prettify_grid(threshold_noise_to_terrain(scale_grid(white_noise(int(sys.argv[1]),int(sys.argv[2])), int(sys.argv[3]))))
 	except:
 		usage()
 
