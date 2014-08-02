@@ -1,4 +1,5 @@
 import sys, random, math
+import pathfinders
 
 # worldgen
 
@@ -61,11 +62,13 @@ def scale_grid(grid, factor):
 		for x in range(new_width):
 			x_scale = (float(x)/new_width)*(grid_width-1)
 
+			# get the values at the four nearest corners in the original octave
 			top_left = grid[int(math.floor(y_scale))][int(math.floor(x_scale))]
 			top_right = grid[int(math.floor(y_scale))][int(math.ceil(x_scale))]
 			bottom_left = grid[int(math.ceil(y_scale))][int(math.floor(x_scale))]
 			bottom_right = grid[int(math.ceil(y_scale))][int(math.ceil(x_scale))]
 
+			# interpolate top left to top right, then bottom left to bottom right, then interpolate those two
 			blend_top = interpolate(top_left, top_right, x_scale-math.floor(x_scale))
 			blend_bottom = interpolate(bottom_left, bottom_right, x_scale-math.floor(x_scale))
 			blend_overall = interpolate(blend_top, blend_bottom, y_scale-math.floor(y_scale))
@@ -126,7 +129,7 @@ def apply_thresholds(grid):
 	variance = sum([(tile-avg)**2 for tile in row for row in grid])/(grid_width*grid_height)
 	stdev = variance**0.5
 
-	terrain = [(avg-(0.6*stdev), ' '), (avg+(1.25*stdev), '.'), (1.1, '^')]
+	terrain = [(avg-(0.3*stdev), ' '), (avg+(1.5*stdev), '.'), (1.1, '^')]
 
 	ret = []
 	for row in grid:
@@ -145,7 +148,7 @@ def apply_thresholds(grid):
 
 
 # generate world: keeps generating worlds until a satisfactory one is found
-def generate_world(w, h, terrain_composition, acceptable_margin=0.05):
+def generate_world(w, h, terrain_composition=[(' ',0.3),('.',0.5),('^',0.2)], acceptable_margin=0.05):
 	# terrain_composition is a list of tile to percentage tuples, eg. [(' ',0.3),('.',0.5),('^',0.2)]
 
 	octaves = range(int(math.log(min(w,h),2)))[-5:] # takes the last 5 powers of 2 closest to min(w,h)
@@ -156,11 +159,12 @@ def generate_world(w, h, terrain_composition, acceptable_margin=0.05):
 
 	satisfactory_world = False # True if the world has the correct percentages of terrain
 	while not satisfactory_world:
-		world = apply_thresholds(generate_noise(w, h, octaves))
+		noise_grid = generate_noise(w, h, octaves)
+		world = apply_thresholds(noise_grid)
 		if debug_mode: print 'world #' + str(worlds_generated) + '\n' + prettify_grid(world)
-		worlds_generated += 1
+		worlds_generated += 1 
 		if debug_mode: print 'generated world #' + str(worlds_generated)
-		satisfactory_world = True
+		satisfactory_world = True # satisfactory_world is set to true by default
 
 		# checks for every tile if the actual composition is within an acceptable margin
 		for (tile,proportion) in terrain_composition:
@@ -168,9 +172,27 @@ def generate_world(w, h, terrain_composition, acceptable_margin=0.05):
 			if debug_mode: print 'proportion of \'' + tile + '\' in world #' + str(worlds_generated) + ': ' + str(tile_proportion)
 			if abs(tile_proportion - proportion) > acceptable_margin:
 				satisfactory_world = False
+				if debug_mode: print 'world #' + str(worlds_generated) + ' was rejected.'
 				break
 
-		if debug_mode and satisfactory_world: print 'world #' + str(worlds_generated) + ' passed!'
+	# world proportion
+	if debug_mode: print 'world #' + str(worlds_generated) + ' passed!'
+	#int_noise_grid = [[int(100.0*tile) for tile in row] for row in noise_grid]
+	num_rivers = random.randint(2,6)
+	for r in range(num_rivers):
+		if debug_mode: print 'generating river %d of %d' % (r, (num_rivers - 1))
+
+		# replace with better endpoint searching pls
+		#p1 = (random.randint(0, ((w-1)//4)), random.randint(0, ((h-1)//4))) # generate random p1 from top-left quadrant
+		#p2 = (random.randint((((w-1)*3)//4), (w-1)), random.randint((((h-1)*3)//4), (h-1))) # generate random p2 from bottom-right quadrant
+		
+		p1 = (random.randint(0, ((w-1)//4)), random.randint(0, (h-1)))
+		p2 = (random.randint((((w-1)*3)//4), (w-1)), random.randint(0, (h-1)))
+		
+		river_seed_grid = [[random.randint(1,15) for tile in row] for row in noise_grid]
+		river = pathfinders.a_star(river_seed_grid, p1, p2, pathfinders.manhattan_distance)
+		for (y,x) in river:
+			world[y][x] = '~' if world[y][x] == '.' else world[y][x]
 
 	return world
 
@@ -186,7 +208,7 @@ List of options:
 
 if __name__ == "__main__":
 	try:
-		debug_mode = ('--debug' in sys.argv)
+		debug_mode = ('--debug' in sys.argv) # debug_mode is true if `--debug` is anywhere in the command
 		print prettify_grid(generate_world(int(sys.argv[1]),int(sys.argv[2]), [(' ',0.4),('.',0.5),('^',0.1)]))
 
 	except:
