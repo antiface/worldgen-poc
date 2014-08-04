@@ -112,24 +112,96 @@ def avg_grids(grids):
 def generate_noise(w, h, octaves=[4,5,6,7,8]):
 	return avg_grids([scale_grid(white_noise(w*(2**(octave-octaves[-1])), h*(2**(octave-octaves[-1]))), 2**(octaves[-1]-octave)) for octave in octaves])
 
-# POST-PROCESSING
+# retrieve value at point from a 2d array
+def grid_at(grid, point):
+	return grid[point[1]][point[0]]
+
+'''
+# diamond square algorithm
+def diamond_square(w,h):
+	grid = [[0 for x in range(w)] for y in range(h)]
+	grid_rect = ((0,0),(w-1,0),(0,h-1),(w-1,h-1))
+	for point in grid_rect:
+		grid[point[1]][point[0]] = random.random()
+
+	rectangles = [grid_rect]
+	# in general, a rectangle is (0,1), where:
+	# 0----+
+	# |    |
+	# +----1
+
+	while rectangles:
+		rect = rectangles.pop(0)
+		# midpoint formula is equivalent to: 
+		# with a rectangle (t1,t2,b1,b2): midpoint = ((t2.x-t1.x)/2),((b1.y-t1.y)/2)
+		midpoint = (((rect[1][0]-rect[0][0])//2),((rect[2][1]-rect[1][1])//2))
+		grid[midpoint[1]][midpoint[0]] = (grid_at(grid,rect[0])+grid_at(grid,rect[1])+grid_at(grid,rect[2])+grid_at(grid,rect[3]))/4
+
+		# generate the four rectangles
+		if midpoint[0]-rect[0][0] >= 2: # x at least 1 apart
+			rectangles.append(rect[0],(midpoint[0],rect[0][1]),(rect[0][0],midpoint[0]),midpoint)
+			rectangles.append((midpoint[0],rect[1][1]),rect[1],midpoint,(,midpoint[1]))
+
+		if midpoint[1]-rect[0][1] >= 2:
+
+
+'''
 
 # converts a 2d grid into their corresponding terrain type
-# TODO: make the terrain dict dynamic to the data given
-def apply_thresholds(grid):
-
-	# analyze grid to determine terrain
-
-	# determine the data mean and std.dev, then use that to set the range
-
+def apply_thresholds(grid, terrain_composition=[(' ',0.5),('.',0.4),('^',0.1)]):
 	grid_width = len(grid[0])
 	grid_height = len(grid)
 
+	actual_terrain_composition = {
+		' ':0.0,
+		'.':0.0,
+		'^':0.0
+	}
+	ret = [[' ' for x in range(grid_width)] for y in range(grid_height)]
+	flat_grid = zip([(x,y) for x in range(grid_width) for y in range(grid_height)],sum(grid, []))
+	sorted_flat_grid = sorted(flat_grid, key=(lambda pair: pair[1]))
+
+	for comp in terrain_composition:
+		if debug_mode: 
+			print comp
+			print actual_terrain_composition[comp[0]]
+		num_tiles_terrain = 0
+		while abs(comp[1] - actual_terrain_composition[comp[0]]) > 0.01:
+			if not sorted_flat_grid:
+				break
+			(coord, tile) = sorted_flat_grid.pop(0)
+			ret[coord[1]][coord[0]] = comp[0]
+			num_tiles_terrain += 1
+			actual_terrain_composition[comp[0]] = float(num_tiles_terrain)/(grid_width*grid_height)
+	else:
+		while sorted_flat_grid:
+			(coord, tile) = sorted_flat_grid.pop(0)
+			ret[coord[1]][coord[0]] = terrain_composition[-1][0]
+
+
+	'''
+	ret = []
+	for row in grid:
+		ret_row = []
+
+		for height in row:
+
+			# check thresholds for tile
+			for (ubound, tile) in terrain:
+				if height <= ubound:
+					ret_row.append(tile)
+					break
+			
+		ret.append(ret_row)
+
+
+	# determine the data mean and std.dev, then use that to set the range
 	avg = sum([sum(row) for row in grid])/(grid_width*grid_height)
 	variance = sum([(tile-avg)**2 for tile in row for row in grid])/(grid_width*grid_height)
 	stdev = variance**0.5
 
-	terrain = [(avg-(0.3*stdev), ' '), (avg+(1.5*stdev), '.'), (1.1, '^')]
+	terrain = [(avg-(0.2*stdev), ' '), (avg+(1.5*stdev), '.'), (1.1, '^')]
+
 
 	ret = []
 	for row in grid:
@@ -144,11 +216,12 @@ def apply_thresholds(grid):
 					break
 			
 		ret.append(ret_row)
+	'''
 	return ret
 
-
 # generate world: keeps generating worlds until a satisfactory one is found
-def generate_world(w, h, terrain_composition=[(' ',0.3),('.',0.5),('^',0.2)], acceptable_margin=0.05):
+# lol the terrain_composition doesn't actually add up to 1
+def generate_world(w, h, terrain_composition=[(' ',0.5),('.',0.4),('^',0.1)], acceptable_margin=0.05):
 	# terrain_composition is a list of tile to percentage tuples, eg. [(' ',0.3),('.',0.5),('^',0.2)]
 
 	octaves = range(int(math.log(min(w,h),2)))[-5:] # takes the last 5 powers of 2 closest to min(w,h)
@@ -160,7 +233,7 @@ def generate_world(w, h, terrain_composition=[(' ',0.3),('.',0.5),('^',0.2)], ac
 	satisfactory_world = False # True if the world has the correct percentages of terrain
 	while not satisfactory_world:
 		noise_grid = generate_noise(w, h, octaves)
-		world = apply_thresholds(noise_grid)
+		world = apply_thresholds(noise_grid, terrain_composition)
 		if debug_mode: print 'world #' + str(worlds_generated) + '\n' + prettify_grid(world)
 		worlds_generated += 1 
 		if debug_mode: print 'generated world #' + str(worlds_generated)
@@ -177,23 +250,49 @@ def generate_world(w, h, terrain_composition=[(' ',0.3),('.',0.5),('^',0.2)], ac
 
 	# world proportion
 	if debug_mode: print 'world #' + str(worlds_generated) + ' passed!'
-	#int_noise_grid = [[int(100.0*tile) for tile in row] for row in noise_grid]
-	num_rivers = random.randint(2,6)
+	# river_seed_grid = [[int(100.0*tile) for tile in row] for row in noise_grid]
+	num_rivers = random.randint(octaves[0],octaves[-1])
+	first_river = [] # store the first river
 	for r in range(num_rivers):
-		if debug_mode: print 'generating river %d of %d' % (r, (num_rivers - 1))
+		if debug_mode: print 'generating river %d of %d' % (r+1, num_rivers)
 
 		# replace with better endpoint searching pls
 		#p1 = (random.randint(0, ((w-1)//4)), random.randint(0, ((h-1)//4))) # generate random p1 from top-left quadrant
 		#p2 = (random.randint((((w-1)*3)//4), (w-1)), random.randint((((h-1)*3)//4), (h-1))) # generate random p2 from bottom-right quadrant
 		
-		p1 = (random.randint(0, ((w-1)//4)), random.randint(0, (h-1)))
-		p2 = (random.randint((((w-1)*3)//4), (w-1)), random.randint(0, (h-1)))
+		# remember, rivers flow from mountains to seas
+		while True:
+			p1 = (random.randint(0, ((w-1)//2)), random.randint(0, (h-1)))
+			if world[p1[1]][p1[0]] == '^':
+				break
 		
-		river_seed_grid = [[random.randint(1,15) for tile in row] for row in noise_grid]
-		river = pathfinders.a_star(river_seed_grid, p1, p2, pathfinders.manhattan_distance)
+		while True:
+			p2 = (random.randint(((w-1)//2), (w-1)), random.randint(0, (h-1)))
+			if world[p2[1]][p2[0]] == ' ':
+				break
+
+		'''
+		if (first_river and random.random() > 0.5):
+			p1 = random.choice(first_river) # pick p1 from first_river
+		else:
+			p1 = (random.randint(0, ((w-1)//4)), random.randint(0, (h-1)))
+		p2 = (random.randint((((w-1)*3)//4), (w-1)), random.randint(0, (h-1)))
+		'''
+
+		#river_seed_grid = [[random.randint(1,15) for tile in row] for row in noise_grid]
+		river_seed_grid = [[int(100.0*tile)+random.randint(-5,5) for tile in row] for row in noise_grid]
+		river = pathfinders.dijkstra(river_seed_grid, p1, p2)
+		#river = pathfinders.a_star(river_seed_grid, p1, p2, pathfinders.manhattan_distance)
+
+		#river = pathfinders.greedy_best_first_search(river_seed_grid, p1, p2, pathfinders.manhattan_distance)
 		for (y,x) in river:
+			#if world[y][x] == '^':
+			#	break
 			world[y][x] = '~' if world[y][x] == '.' else world[y][x]
 
+
+		if (r < 2):
+			first_river = river
 	return world
 
 # prints a 2d array of characters without spaces between
@@ -207,9 +306,14 @@ List of options:
 	'''
 
 if __name__ == "__main__":
+	debug_mode = ('--debug' in sys.argv) # debug_mode is true if `--debug` is anywhere in the command
+
+	if debug_mode: 
+		print prettify_grid(generate_world(int(sys.argv[1]),int(sys.argv[2])))
+		sys.exit()
+
 	try:
-		debug_mode = ('--debug' in sys.argv) # debug_mode is true if `--debug` is anywhere in the command
-		print prettify_grid(generate_world(int(sys.argv[1]),int(sys.argv[2]), [(' ',0.4),('.',0.5),('^',0.1)]))
+		print prettify_grid(generate_world(int(sys.argv[1]),int(sys.argv[2])))
 
 	except:
 		usage()
