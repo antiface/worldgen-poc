@@ -148,7 +148,7 @@ def diamond_square(w,h):
 '''
 
 # converts a 2d grid into their corresponding terrain type
-def apply_thresholds(grid, terrain_composition=[(' ',0.5),('.',0.4),('^',0.1)]):
+def apply_thresholds(grid, terrain_composition=[(' ',0.6),('.',0.3),('^',0.1)]):
 	grid_width = len(grid[0])
 	grid_height = len(grid)
 
@@ -177,7 +177,6 @@ def apply_thresholds(grid, terrain_composition=[(' ',0.5),('.',0.4),('^',0.1)]):
 		while sorted_flat_grid:
 			(coord, tile) = sorted_flat_grid.pop(0)
 			ret[coord[1]][coord[0]] = terrain_composition[-1][0]
-
 
 	'''
 	ret = []
@@ -219,9 +218,30 @@ def apply_thresholds(grid, terrain_composition=[(' ',0.5),('.',0.4),('^',0.1)]):
 	'''
 	return ret
 
+# find_river: a quick greedy method to generate rivers by finding the lowest neighbor until a water tile is reached.
+def find_river(height_map, world, start):
+	current = start
+	river = [start]
+	width = len(world[0])
+	height = len(world)
+
+	while world[current[1]][current[0]] != ' ' and world[current[1]][current[0]] != '~':
+		if debug_mode: print current
+		adjacent_coords = [(current[0]-1,current[1]),(current[0]+1,current[1]),(current[0],current[1]-1),(current[0],current[1]+1)]
+		if debug_mode: print adjacent_coords
+		adjacent_coords = filter((lambda coord: coord not in river and coord[0] >= 0 and coord[1] >= 0 and coord[0] < width and coord[1] < height), adjacent_coords)
+		if debug_mode: print adjacent_coords
+		neighbors = [(world[coord[1]][coord[0]], coord) for coord in adjacent_coords] #
+		if not neighbors:
+			break
+		current = min(neighbors)[1] # take the coordinate of the minimum neighbor
+		river.append(current)
+
+	if debug_mode: print river
+	return river
+
 # generate world: keeps generating worlds until a satisfactory one is found
-# lol the terrain_composition doesn't actually add up to 1
-def generate_world(w, h, terrain_composition=[(' ',0.5),('.',0.4),('^',0.1)], acceptable_margin=0.05):
+def generate_world(w, h, terrain_composition=[(' ',0.3),('.',0.5),('^',0.2)], acceptable_margin=0.1):
 	# terrain_composition is a list of tile to percentage tuples, eg. [(' ',0.3),('.',0.5),('^',0.2)]
 
 	octaves = range(int(math.log(min(w,h),2)))[-5:] # takes the last 5 powers of 2 closest to min(w,h)
@@ -242,15 +262,16 @@ def generate_world(w, h, terrain_composition=[(' ',0.5),('.',0.4),('^',0.1)], ac
 		# checks for every tile if the actual composition is within an acceptable margin
 		for (tile,proportion) in terrain_composition:
 			tile_proportion = sum([row.count(tile) for row in world])/float(world_area)
-			if debug_mode: print 'proportion of \'' + tile + '\' in world #' + str(worlds_generated) + ': ' + str(tile_proportion)
+			if debug_mode: print 'proportion of \'' + tile + '\' in world #' + str(worlds_generated) + ': ' + str(tile_proportion) + '(expected ' + str(proportion) + ')'
 			if abs(tile_proportion - proportion) > acceptable_margin:
 				satisfactory_world = False
 				if debug_mode: print 'world #' + str(worlds_generated) + ' was rejected.'
 				break
 
-	# world proportion
 	if debug_mode: print 'world #' + str(worlds_generated) + ' passed!'
 	# river_seed_grid = [[int(100.0*tile) for tile in row] for row in noise_grid]
+
+	# generate rivers
 	num_rivers = random.randint(octaves[0],octaves[-1])
 	first_river = [] # store the first river
 	for r in range(num_rivers):
@@ -281,18 +302,23 @@ def generate_world(w, h, terrain_composition=[(' ',0.5),('.',0.4),('^',0.1)], ac
 
 		#river_seed_grid = [[random.randint(1,15) for tile in row] for row in noise_grid]
 		river_seed_grid = [[int(100.0*tile)+random.randint(-5,5) for tile in row] for row in noise_grid]
-		river = pathfinders.dijkstra(river_seed_grid, p1, p2)
+		#river = pathfinders.dijkstra(river_seed_grid, p1, p2)
+
+		river = find_river(river_seed_grid, world, p1)
 		#river = pathfinders.a_star(river_seed_grid, p1, p2, pathfinders.manhattan_distance)
 
 		#river = pathfinders.greedy_best_first_search(river_seed_grid, p1, p2, pathfinders.manhattan_distance)
 		for (y,x) in river:
-			#if world[y][x] == '^':
-			#	break
+			if world[y][x] == '^':
+				break
 			world[y][x] = '~' if world[y][x] == '.' else world[y][x]
 
 
 		if (r < 2):
 			first_river = river
+
+		# generate structures
+
 	return world
 
 # prints a 2d array of characters without spaces between
@@ -309,7 +335,7 @@ if __name__ == "__main__":
 	debug_mode = ('--debug' in sys.argv) # debug_mode is true if `--debug` is anywhere in the command
 
 	if debug_mode: 
-		print prettify_grid(generate_world(int(sys.argv[1]),int(sys.argv[2])))
+		print prettify_grid(generate_world(int(sys.argv[1]),int(sys.argv[2]),[(' ',0.5),('.',0.4),('^',0.1)]))
 		sys.exit()
 
 	try:
