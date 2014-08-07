@@ -116,7 +116,6 @@ def generate_noise(w, h, octaves=[4,5,6,7,8]):
 def grid_at(grid, point):
 	return grid[point[1]][point[0]]
 
-'''
 # diamond square algorithm
 def diamond_square(w,h):
 	grid = [[0 for x in range(w)] for y in range(h)]
@@ -125,27 +124,28 @@ def diamond_square(w,h):
 		grid[point[1]][point[0]] = random.random()
 
 	rectangles = [grid_rect]
-	# in general, a rectangle is (0,1), where:
-	# 0----+
+	# in general, a rectangle is (0,1,2,3), where:
+	# 0----1
 	# |    |
-	# +----1
+	# 2----3
 
 	while rectangles:
 		rect = rectangles.pop(0)
 		# midpoint formula is equivalent to: 
 		# with a rectangle (t1,t2,b1,b2): midpoint = ((t2.x-t1.x)/2),((b1.y-t1.y)/2)
 		midpoint = (((rect[1][0]-rect[0][0])//2),((rect[2][1]-rect[1][1])//2))
-		grid[midpoint[1]][midpoint[0]] = (grid_at(grid,rect[0])+grid_at(grid,rect[1])+grid_at(grid,rect[2])+grid_at(grid,rect[3]))/4
+		grid[midpoint[1]][midpoint[0]] = sum([grid_at(point) for point in rect])/len(rect) + random.uniform(-0.1,0.1)
 
 		# generate the four rectangles
-		if midpoint[0]-rect[0][0] >= 2: # x at least 1 apart
-			rectangles.append(rect[0],(midpoint[0],rect[0][1]),(rect[0][0],midpoint[0]),midpoint)
-			rectangles.append((midpoint[0],rect[1][1]),rect[1],midpoint,(,midpoint[1]))
+		if midpoint[0]-rect[0][0] >= 2 and midpoint[1]-rect[0][1] >= 2: # x at least 1 apart
+			rectangles.append((rect[0],(midpoint[0],rect[0][1]),(rect[0][0],midpoint[0]),midpoint))
+			rectangles.append(((midpoint[0],[rect[1][1]]),rect[1],midpoint,(rect[1][0],midpoint[1])))
+			rectangles.append(((rect[2][0],midpoint[1]),midpoint,rect[2],(midpoint[0],rect[2][1])))
+			rectangles.append((midpoint, (rect[3][0],midpoint[1]), (midpoint[0],rect[3][1]), rect[3]))
 
-		if midpoint[1]-rect[0][1] >= 2:
+	return grid
 
 
-'''
 
 # converts a 2d grid into their corresponding terrain type
 def apply_thresholds(grid, terrain_composition=[(' ',0.6),('.',0.3),('^',0.1)]):
