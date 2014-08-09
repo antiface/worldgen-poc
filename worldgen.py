@@ -146,7 +146,6 @@ def diamond_square(w,h):
 	return grid
 
 
-
 # converts a 2d grid into their corresponding terrain type
 def apply_thresholds(grid, terrain_composition=[(' ',0.6),('.',0.3),('^',0.1)]):
 	grid_width = len(grid[0])
@@ -240,6 +239,40 @@ def find_river(height_map, world, start):
 	if debug_mode: print river
 	return river
 
+# identify all the separate landmasses in a world using floodfill, returning it as a list of continents
+# each continent is a list of coordinates
+def identify_landmasses(world):
+	landmasses = []
+
+	world_map = world_map[:] # make a copy of the world for floodfill purposes
+
+	width = len(world_map[0])
+	height = len(world_map)
+
+	for y in range(height):
+		for x in range(width):
+			if world_map[y][x] == ' ':
+				continue
+
+		tile_queue = [(x,y)] # evaluate tiles as a queue
+		visited = []
+		landmass = []
+
+		while(tile_queue):
+			current = tile_queue.pop(0)
+			visited.append(current)
+			if world_map[current[1]][current[0]] != ' ':
+				adjacent_coords = [(current[0]-1,current[1]),(current[0]+1,current[1]),(current[0],current[1]-1),(current[0],current[1]+1)]
+				if debug_mode: print adjacent_coords
+				adjacent_coords = filter((lambda coord: coord not in visited and coord[0] >= 0 and coord[1] >= 0 and coord[0] < width and coord[1] < height), adjacent_coords)
+				if debug_mode: print adjacent_coords
+				tile_queue.extend(adjacent_coords)
+				landmass.append(current)
+				world_map[current[1]][current[0]] = ' '
+		landmasses.push(landmass)
+
+	return landmasses
+
 # generate world: keeps generating worlds until a satisfactory one is found
 def generate_world(w, h, terrain_composition=[(' ',0.3),('.',0.5),('^',0.2)], acceptable_margin=0.1):
 	# terrain_composition is a list of tile to percentage tuples, eg. [(' ',0.3),('.',0.5),('^',0.2)]
@@ -329,13 +362,21 @@ def usage():
 	print '''Usage: python worldgen.py [WIDTH] [HEIGHT] [options]
 List of options:
 	--debug - print debug messages
+	--seed [SEED] - seed random number generator
 	'''
 
 if __name__ == "__main__":
 	debug_mode = ('--debug' in sys.argv) # debug_mode is true if `--debug` is anywhere in the command
 
+	if '--seed' in sys.argv:
+		seed_input = int(sys.argv[sys.argv.index('--seed') + 1])
+	else:
+		seed_input = None
+	
+	random.seed(seed_input)
+
 	if debug_mode: 
-		print prettify_grid(generate_world(int(sys.argv[1]),int(sys.argv[2]),[(' ',0.5),('.',0.4),('^',0.1)]))
+		print prettify_grid(generate_world(int(sys.argv[1]),int(sys.argv[2])))
 		sys.exit()
 
 	try:
