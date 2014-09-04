@@ -24,7 +24,9 @@ class WorldGenTestCase1(unittest.TestCase):
 
 class DiamondSquareTestCase1(unittest.TestCase):
 	def runTest(self):
-		world = worldgen.diamond_square(64, 64)
+		world = worldgen.diamond_square(9, 9)
+
+		print world
 
 		# assert map has proper amounts of terrain
 		assert(True)
