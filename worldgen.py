@@ -6,6 +6,7 @@ import pathfinders
 # HELPER FUNCTIONS
 
 debug_mode = True
+debug_mode = False
 
 # float_equal check if two floats are equal
 def float_equal(a,b):
@@ -134,12 +135,12 @@ def diamond_square(w,h):
 		# midpoint formula is equivalent to: 
 		# with a rectangle (t1,t2,b1,b2): midpoint = ((t2.x-t1.x)/2),((b1.y-t1.y)/2)
 		midpoint = (((rect[1][0]-rect[0][0])//2),((rect[2][1]-rect[1][1])//2))
-		grid[midpoint[1]][midpoint[0]] = sum([grid_at(point) for point in rect])/len(rect) + random.uniform(-0.1,0.1)
+		grid[midpoint[1]][midpoint[0]] = sum([grid_at(grid, point) for point in rect])/len(rect) + random.uniform(-0.1,0.1)
 
 		# generate the four rectangles
 		if midpoint[0]-rect[0][0] >= 2 and midpoint[1]-rect[0][1] >= 2: # x at least 1 apart
 			rectangles.append((rect[0],(midpoint[0],rect[0][1]),(rect[0][0],midpoint[0]),midpoint))
-			rectangles.append(((midpoint[0],[rect[1][1]]),rect[1],midpoint,(rect[1][0],midpoint[1])))
+			rectangles.append(((midpoint[0],rect[1][1]),rect[1],midpoint,(rect[1][0],midpoint[1])))
 			rectangles.append(((rect[2][0],midpoint[1]),midpoint,rect[2],(midpoint[0],rect[2][1])))
 			rectangles.append((midpoint, (rect[3][0],midpoint[1]), (midpoint[0],rect[3][1]), rect[3]))
 
