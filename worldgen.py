@@ -6,7 +6,6 @@ import pathfinders
 # HELPER FUNCTIONS
 
 debug_mode = True
-debug_mode = False
 
 # float_equal check if two floats are equal
 def float_equal(a,b):
